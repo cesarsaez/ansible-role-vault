@@ -1,0 +1,193 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    vault_root_dir: /data
+    vault_bin_dir: /bin
+    vault_user: vault
+    vault_nodes_names:
+        - "vault01"
+        - "vault02"
+        - "myvaultcluster"
+    vault_version: 1.4.0-rc1
+    vault_download_base: https://releases.hashicorp.com/vault/
+    # Check the VAULT_ vars certificates path below based on the value of vault_root_dir 
+    os_environment:
+    - key: VAULT_ADDR 
+      value : "https://{{ ansible_hostname }}:8200"
+    - key: VAULT_CLIENT_CERT 
+      value : /data/tls/vault.crt
+    - key: VAULT_CLIENT_KEY 
+      value : /data/tls/vault.key
+    - key: VAULT_CACERT
+      value: /data/tls/vault.crt
+    ca_path: /etc/pki/ca-trust/source/anchors
+
+
+  tasks:
+  - name: Ensure all host on the playbook can resolve DNS through the /etc/hosts file with node name
+    lineinfile:
+      dest: /etc/hosts
+      regexp: '.*{{ item }}$'
+      line: '{{ hostvars[item].ansible_host }} {{item}}'
+      state: present
+    with_items: '{{ groups["vault"] }}'
+    tags: no_dns
+
+  - name: Ensure firewallD is stopped and disabled
+    systemd:
+      name: firewalld
+      state: stopped
+      enabled: no
+
+
+  - name: Ensure Vault directories are present
+    file:
+      path: "{{ vault_root_dir}}/{{ item }}"
+      state: directory
+      recurse: yes
+    loop:
+      - /vault-data/
+      - /bin/
+      - /etc/vault.d/
+      - /tls/
+      - /logs/
+
+  - name: Create Vault service account with no shell
+    user:
+      name: "{{ vault_user }}"
+      shell: /bin/bash
+      system: True
+      home: /data
+
+  - name: Ensure Vault directories permission are present
+    file:
+      path: "{{ vault_root_dir}}/{{ item }}"
+      state: directory
+      owner: "{{ vault_user }}"
+      group: "{{ vault_user }}"
+      mode: '0775'
+      recurse: yes
+    loop:
+      - "/vault-data/{{ ansible_hostname }}"
+      - /bin/
+      - /etc/vault.d/
+      - /tls/
+      - /logs/
+
+  - name: Add Vault bin directory to system-wide $PATH.
+    copy:
+      dest: /etc/profile.d/custom-path.sh
+      content: 'PATH=$PATH:{{ vault_root_dir }}{{ vault_bin_dir}}'
+
+  - name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+    openssl_privatekey:
+      path: "{{ vault_root_dir}}/tls/vault.key"
+      type: RSA
+      owner: "{{ vault_user }}"
+    when: ansible_hostname == "vault01"
+    tags: selfsignedcert
+
+  - name: Generate an OpenSSL Certificate Signing Request
+    openssl_csr:
+      path: "{{ vault_root_dir}}/tls/vault.csr"
+      privatekey_path: "{{ vault_root_dir}}/tls/vault.key"
+      country_name: ES
+      organization_name: Vault
+      common_name: vault.myhomelab.net
+      subject_alt_name: 'DNS:vault01,DNS:vault02'
+      owner: "{{ vault_user }}"
+    when: ansible_hostname == "vault01"
+    tags: selfsignedcert
+
+
+  - name: Generate a Self Signed OpenSSL certificate
+    openssl_certificate:
+      path: "{{ vault_root_dir}}/tls/vault.crt"
+      privatekey_path: "{{ vault_root_dir}}/tls/vault.key"
+      csr_path: "{{ vault_root_dir}}/tls/vault.csr"
+      provider: selfsigned
+      owner: "{{ vault_user }}"
+    when: ansible_hostname == "vault01"
+    tags: selfsignedcert
+
+
+  - name: Get the certificates from 1st node
+    fetch:
+      src: "{{ vault_root_dir }}/tls/{{ item }}"
+      dest: /tmp/vaultcerts/
+    when: ansible_hostname == "vault01"
+    loop:
+      - vault.crt
+      - vault.key
+
+    
+  - name: Copy the certificates from 1st node to the rest of nodes
+    copy:
+      src: /tmp/vaultcerts/vault01/data/tls/
+      dest: "{{ vault_root_dir }}/tls/"
+    when: ansible_hostname != "vault01"
+    loop:
+      - vault.crt
+      - vault.key
+
+  
+  - name: install ca package on rhel systems
+    yum:
+      name: ca-certificates
+      state: present
+    tags: selfsignedcert
+
+  - name: copy certificate authority to trusted ca path of the os
+    copy:
+      src: "{{ vault_root_dir}}/tls/vault.crt"
+      dest: '{{ ca_path }}/'
+      owner: root
+      group: root
+      mode: 0644
+      remote_src: yes
+    tags: selfsignedcert
+
+  - name: update trusted ca redhat
+    shell: /bin/update-ca-trust
+    tags: selfsignedcert
+
+
+  - name: Ensure Vault vesion is downloaded at the Vault bin dir
+    unarchive:
+      src: "{{ vault_download_base }}{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
+      dest: "{{ vault_root_dir}}/bin/"
+      remote_src: True
+      mode: '0775'
+
+  - name: Ensure Vault systemd service is present
+    template:
+      src: "templates/vault.service.j2"
+      dest: "/etc/systemd/system/vault.service"
+      owner: root
+      group: "{{ vault_user }}"
+      mode: '0775'
+
+  - name: Ensure Vault config file is present
+    template:
+      src: "templates/vault.hcl.j2"
+      dest: "{{ vault_root_dir}}/etc/vault.d/vault.hcl"
+      owner: "{{ vault_user }}"
+      group: "{{ vault_user }}"
+
+  - name: Ensure VAULT envirment variables are set for all users at /etc/environment
+    lineinfile:
+      dest: "/etc/environment"
+      state: present
+      regexp: "^{{ item.key }}="
+      line: "{{ item.key }}={{ item.value}}"
+    with_items: "{{ os_environment }}"
+
+  - name: Ensure Vault service is restarted
+    systemd:
+      name: vault
+      state: started
+      enabled: yes
+      daemon_reload: yes
+
+
