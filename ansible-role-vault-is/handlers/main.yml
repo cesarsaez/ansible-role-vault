@@ -1,0 +1,6 @@
+---
+# handlers file for ansible-role-vault-is
+- name: Restart Vault
+  service:
+    name: vault
+    state: restartedS

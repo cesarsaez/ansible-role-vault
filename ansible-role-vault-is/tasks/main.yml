@@ -1,0 +1,88 @@
+---
+# tasks file for ansible-role-vault-is
+- name: Ensure firewallD is stopped and disabled
+  systemd:
+    name: firewalld
+    state: stopped
+    enabled: no
+
+- name: Ensure Vault directories are present
+  file:
+    path: "{{ vault_root_dir}}/{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /vault-data/
+    - /bin/
+    - /etc/vault.d/
+    - /tls/
+    - /logs/
+
+- name: Create Vault service account with no shell
+  user:
+    name: "{{ vault_user }}"
+    shell: /bin/bash
+    system: True
+    home: /data
+
+- name: Ensure Vault directories permission are present
+  file:
+    path: "{{ vault_root_dir}}/{{ item }}"
+    state: directory
+    owner: "{{ vault_user }}"
+    group: "{{ vault_user }}"
+    mode: '0775'
+    recurse: yes
+  loop:
+    - "/vault-data/{{ ansible_hostname }}"
+    - /bin/
+    - /etc/vault.d/
+    - /tls/
+    - /logs/
+
+- name: Add Vault bin directory to system-wide $PATH.
+  copy:
+    dest: /etc/profile.d/custom-path.sh
+    content: 'PATH=$PATH:{{ vault_root_dir }}{{ vault_bin_dir}}'
+
+- name: Ensure Vault vesion is downloaded at the Vault bin dir
+  unarchive:
+    src: "{{ vault_download_base }}{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
+    dest: "{{ vault_root_dir}}/bin/"
+    remote_src: True
+    mode: '0775'
+
+- name: Ensure Vault systemd file service definition is present
+  template:
+    src: "templates/vault.service.j2"
+    dest: "/etc/systemd/system/vault.service"
+    owner: root
+    group: "{{ vault_user }}"
+    mode: '0775'
+
+- name: Ensure Vault config file is present
+  template:
+    src: "templates/vault.hcl.j2"
+    dest: "{{ vault_root_dir}}/etc/vault.d/vault.hcl"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_user }}"
+  notify: Restart Vault
+
+- name: Ensure VAULT envirment variables are set for all users at /etc/environment
+  lineinfile:
+    dest: "/etc/environment"
+    state: present
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value}}"
+  loop: 
+    - {key: 'VAULT_CLIENT_CERT', value: "{{ vault_cert_path }}" } 
+    - {key: 'VAULT_CLIENT_KEY', value: "{{ vault_cert_key_path }}" }
+    - {key: 'VAULT_CACERT', value: "{{ vault_ca_path }}" }
+    - {key: 'VAULT_ADDR',  value: "{{ vault_addr }}" }
+
+- name: Ensure Vault service is restarted
+  systemd:
+    name: vault
+    state: started
+    enabled: yes
+    daemon_reload: yes

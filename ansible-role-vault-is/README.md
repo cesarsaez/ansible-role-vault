@@ -1,4 +1,5 @@
-# Ansible role for Vault with Internal Storage
+Ansible role for Vault with Internal Storage
+=========
 
 The following Ansible role is intended for deploying a Vault cluster with the following assumptions:
 
@@ -9,32 +10,17 @@ The following Ansible role is intended for deploying a Vault cluster with the fo
 * A given servername  will be the cluster leader, the rest of nodes will join the RAFT cluster
 * TLS certificates must be provided in advance, we can use this Ansible role to meet requirements https://github.com/cesarsaez/ansible-role-opensslcaandcerts
 
-## Role tasks
 
-* Disables FirewallD
-* Storage path creation and permissions
-* User accounts
-* Vault download
-* Vault systemd service
-* Vault config
-* Enviroment variables
-* Start Vault service
+Requirements
+------------
 
-TODO:
+TLS certificates must be provided in advance, we can use this Ansible role to meet requirements https://github.com/cesarsaez/ansible-role-opensslcaandcerts
 
-* Vault cluster init
-* Vault cluster unseal
-* Join nodes to RAFT cluster  https://learn.hashicorp.com/vault/operations/raft-storage#create-an-ha-cluster 
-* Authentication backends
-* Convert the playbook into an Ansible Role
 
-NEXT ITERATION:
+Example Playbook
+----------------
 
-* auto-unseal with azure key vault
-* init with PGP
-* bootstrapping of ACL and backends
-
-## Usage
+Including an example of how to use the role setting the minimun variables:
 
 ```
 - hosts: vault
@@ -54,3 +40,13 @@ NEXT ITERATION:
       vault_ca_path: /etc/pki/tls/certs/VAULT-CA.crt
       vault_addr: "https://{{ ansible_hostname }}:8200"
 ```
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
