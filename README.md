@@ -26,7 +26,6 @@ TODO:
 * Vault cluster unseal
 * Join nodes to RAFT cluster  https://learn.hashicorp.com/vault/operations/raft-storage#create-an-ha-cluster 
 * Authentication backends
-* Convert the playbook into an Ansible Role
 
 NEXT ITERATION:
 

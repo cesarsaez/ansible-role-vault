@@ -3,8 +3,8 @@ storage "raft" {
   node_id = "{{ ansible_hostname }}"
 }
 listener "tcp" {
-  address     = "0.0.0.0:8200"
-  cluster_address = "0.0.0.0:8201"
+  address     = "{{ ansible_default_ipv4.address|default(ansible_all_ipv4_addresses[0]) }}:8200"
+  cluster_address = "{{ ansible_default_ipv4.address|default(ansible_all_ipv4_addresses[0]) }}:8201"
   tls_client_ca_file = "{{ vault_ca_path }}"
   tls_cert_file = "{{ vault_cert_path }}"
   tls_key_file = "{{ vault_cert_key_path }}"
@@ -12,5 +12,5 @@ listener "tcp" {
 ui=true
 disable_cache = true
 disable_mlock = true
-cluster_addr = "https://0.0.0.0:8201"
-api_addr = "https://0.0.0.0:8200"
+cluster_addr = "https://{{ ansible_default_ipv4.address|default(ansible_all_ipv4_addresses[0]) }}:8201"
+api_addr = "https://{{ ansible_default_ipv4.address|default(ansible_all_ipv4_addresses[0]) }}:8200"

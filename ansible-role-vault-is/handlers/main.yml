@@ -3,4 +3,4 @@
 - name: Restart Vault
   service:
     name: vault
-    state: restartedS
+    state: restarted
