@@ -41,7 +41,6 @@ Its know that sometimes, depending on the size of the **key_shares_number** vari
 ## NEXT ITERATION:
 
 * auto-unseal with azure key vault
-* init with PGP
 * bootstrapping of ACL and backends
 
 ## Usage
