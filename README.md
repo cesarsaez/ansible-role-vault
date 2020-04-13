@@ -35,6 +35,17 @@ NEXT ITERATION:
 
 ## Usage
 
+Ensure the inventory file contains a group with all the cluster members using this format
+
+```
+[vault]
+vault01 ansible_host=192.168.1.151
+vault02 ansible_host=192.168.1.152
+vault03 ansible_host=192.168.1.153
+```
+
+Then prepare a playbook with this content
+
 ```
 - hosts: vault
   become: yes
