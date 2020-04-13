@@ -20,14 +20,19 @@ The following Ansible role is intended for deploying a Vault cluster with the fo
 * Enviroment variables
 * Start Vault service
 
-TODO:
+## Support playbook initialize_join.yml
 
 * Vault cluster init
 * Vault cluster unseal
-* Join nodes to RAFT cluster  https://learn.hashicorp.com/vault/operations/raft-storage#create-an-ha-cluster 
-* Authentication backends
+* Join nodes to RAFT cluster 
 
-NEXT ITERATION:
+**Assumptions:** The threshold value to unseal the cluster is 2 keys in order to ease the process.
+
+### Know issues
+
+Its know that sometimes, depending on the size of the **key_shares_number** variable and the randomization to get them, its possible that the Unseal process fails becasue both random unseal keys are the same.
+
+## NEXT ITERATION:
 
 * auto-unseal with azure key vault
 * init with PGP

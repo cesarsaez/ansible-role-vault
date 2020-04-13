@@ -7,7 +7,6 @@
       - vault03
     init_file_path: /root/vault-init.txt
     key_shares_number: 8
-    key_thershold: 2
 
   tasks:
     - name: Ensure Json Parser package is present
@@ -35,7 +34,7 @@
       when: ansible_hostname == vault_inital_leader_node and 'true' in init_status.stdout
 
     - name: Initialize Vault Cluster
-      shell: "/data/bin/vault operator init -format=json -key-shares {{ key_shares_number }} -key-threshold {{ key_thershold }} > {{ init_file_path }}"
+      shell: "/data/bin/vault operator init -format=json -key-shares {{ key_shares_number }} -key-threshold 2 > {{ init_file_path }}"
       args:
         chdir: /root/
         executable: /bin/bash
