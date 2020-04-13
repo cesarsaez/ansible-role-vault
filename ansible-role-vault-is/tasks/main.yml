@@ -6,6 +6,11 @@
     state: stopped
     enabled: no
 
+- name: Ensure Json Parser package is present
+  yum:
+    name: jq
+    state: present
+
 - name: Ensure Vault directories are present
   file:
     path: "{{ vault_root_dir}}/{{ item }}"

@@ -20,21 +20,41 @@ The following Ansible role is intended for deploying a Vault cluster with the fo
 * Enviroment variables
 * Start Vault service
 
-TODO:
+## Support playbook initialize_join.yml
+
+In order to ease the cluster initialziation, unseal and join the nodes to the cluster, you can use initialize_join.yml file.
+
+In Production enviroment is not recommended to use initialize_join.yml playbook, its just a one-time action and is safer to avoid use of Ansible and safeguard the unseal_keys and root_key.
+
+The playbook does: 
 
 * Vault cluster init
 * Vault cluster unseal
-* Join nodes to RAFT cluster  https://learn.hashicorp.com/vault/operations/raft-storage#create-an-ha-cluster 
-* Authentication backends
-* Convert the playbook into an Ansible Role
+* Join nodes to RAFT cluster 
 
-NEXT ITERATION:
+**Assumptions:** The threshold value to unseal the cluster is 2 keys in order to ease the process.
+
+### Know issues
+
+Its know that sometimes, depending on the size of the **key_shares_number** variable and the randomization to get them, its possible that the Unseal process fails becasue both random unseal keys are the same.
+
+## NEXT ITERATION:
 
 * auto-unseal with azure key vault
-* init with PGP
 * bootstrapping of ACL and backends
 
 ## Usage
+
+Ensure the inventory file contains a group with all the cluster members using this format
+
+```
+[vault]
+vault01 ansible_host=192.168.1.151
+vault02 ansible_host=192.168.1.152
+vault03 ansible_host=192.168.1.153
+```
+
+Then prepare a playbook with this content
 
 ```
 - hosts: vault
