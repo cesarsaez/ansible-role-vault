@@ -22,6 +22,12 @@ The following Ansible role is intended for deploying a Vault cluster with the fo
 
 ## Support playbook initialize_join.yml
 
+In order to ease the cluster initialziation, unseal and join the nodes to the cluster, you can use initialize_join.yml file.
+
+In Production enviroment is not recommended to use initialize_join.yml playbook, its just a one-time action and is safer to avoid use of Ansible and safeguard the unseal_keys and root_key.
+
+The playbook does: 
+
 * Vault cluster init
 * Vault cluster unseal
 * Join nodes to RAFT cluster 
