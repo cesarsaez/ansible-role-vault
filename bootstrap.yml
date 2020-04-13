@@ -10,20 +10,7 @@
     key_shares_number: 8
     key_thershold: 2
   
-  tasks:
-    #- name: Set Ansible_Fact with the server name that will create act as RAFT leader for the bootstrap
-    #  set_fact:
-    #    root_ca_server: "{{ vault_inital_leader_node }}"
-    #  when: ansible_hostname == vault_inital_leader_node
-    #  tags: groups
-
-   # - name: Set ansible_fact with  server names act as RAFT  follewers hostname
-   #   set_fact:
-   #     followers: "{{ item }}"
-   #   #when: ansible_hostname != vault_inital_leader_node
-   #   loop: "{{ vault_followers_nodes }}"
-   #   tags: followers
-    
+  tasks:  
     - name: Ensure Json Parser package is present
       yum:
         name: jq
@@ -49,7 +36,7 @@
     #  when: ansible_hostname == vault_inital_leader_node and 'true' in init_status.stdout
 
     - name: Initialize Vault Cluster 
-      shell: "/data/bin/vault operator init -format=json -key-shares 8 -key-threshold 2 > {{ init_file_path }}"
+      shell: "/data/bin/vault operator init -format=json -key-shares {{ key_shares_number }} -key-threshold {{ key_thershold }} > {{ init_file_path }}"
       args:
         chdir: /root/
         executable: /bin/bash
@@ -69,23 +56,18 @@
       register: init_status
       when: ansible_hostname == vault_inital_leader_node
     
-#    - name: show init_status
-#      debug:
-#        var: init_status
-#      when: ansible_hostname == vault_inital_leader_node
-
     - name: Triggers a failure in case the initialization file is absent
       fail:
         msg: "Error, the Vault cluster initialization failed while creating the {{ init_file_path }} file"
       when: ansible_hostname == vault_inital_leader_node and init_file.stat.exists == False
 
     - name: Get random unseal key 1
-      shell: "cat {{ init_file_path }} | jq -r .unseal_keys_b64[{{ 8 | random(start=1, step=1) }}]"
+      shell: "cat {{ init_file_path }} | jq -r .unseal_keys_b64[{{ key_shares_number | random(start=1, step=1) }}]"
       register: unseal_key1
       when: (ansible_hostname == vault_inital_leader_node) and ('true' in init_status.stdout)
 
     - name: Get random unseal key 2
-      shell: "cat {{ init_file_path }} | jq -r .unseal_keys_b64[{{ 8 | random(start=1, step=1) }}]"
+      shell: "cat {{ init_file_path }} | jq -r .unseal_keys_b64[{{ key_shares_number | random(start=1, step=1) }}]"
       register: unseal_key2
       when: (ansible_hostname == vault_inital_leader_node) and ('true' in init_status.stdout)
       
@@ -93,34 +75,24 @@
       shell: "cat {{ init_file_path }} | jq -r .root_token"
       register: root_key
       when: (ansible_hostname == vault_inital_leader_node) and ('true' in init_status.stdout)
-##danger
+
     - name: Set host variables with the unseal keys and root key for the join to cluster of the other nodes
       add_host:
         unseal_key01: "{{ unseal_key1.stdout }}"
-        unseal_key02: "{{ unseal_key1.stdout }}"
+        unseal_key02: "{{ unseal_key2.stdout }}"
         root_key01: "{{ root_key.stdout }}"
         hostname: "{{ ansible_hostname }}"
-      #loop: "{{ vault_followers_nodes }}"
-      #when: ansible_hostname != vault_inital_leader_node
-
-    - name: show unseal_key01
-      debug:
-        msg: "Esta es la key1: {{ hostvars[vault_inital_leader_node]['unseal_key01'] }}"
-      loop: "{{ vault_followers_nodes }}"
-
-      #when: ansible_hostname == vault_inital_leader_node  and 'true' in init_status.stdout
-    
-    - name: show unseal_key02
-      debug:
-        msg: "Esta es la key2: {{ hostvars[vault_inital_leader_node]['unseal_key01'] }}"
-      loop: "{{ vault_followers_nodes }}"
-      #when: ansible_hostname == vault_inital_leader_node  and 'true' in init_status.stdout
 
     - name: Useal process step 1 Vault Cluster Leader
       shell: "/data/bin/vault operator unseal {{ unseal_key1.stdout}}"
       args:
         chdir: /root/
         executable: /bin/bash
+      when: ansible_hostname == vault_inital_leader_node and 'true' in init_status.stdout
+
+    - name: Wait for 5 seconds during cluster leader unseal
+      wait_for:
+        timeout: 5
       when: ansible_hostname == vault_inital_leader_node and 'true' in init_status.stdout
 
     - name: Useal process step 2 Vault Cluster Leader
@@ -130,19 +102,17 @@
         executable: /bin/bash
       when: ansible_hostname == vault_inital_leader_node and 'true' in init_status.stdout
 
+    - name: Wait for 5 seconds to cluster initialize
+      wait_for:
+        timeout: 5
+      when: ansible_hostname == vault_inital_leader_node
+
     - name: Check Vault Cluster Seal status
       shell: /data/bin/vault status -format=json | jq -r .sealed
       args:
         chdir: /root/
         executable: /bin/bash
       register: seal_status
-      when: ansible_hostname == vault_inital_leader_node
-      tags: join
-
-
-    - name: Wait for 10 seconds to cluster initialize
-      wait_for:
-        timeout: 10
       when: ansible_hostname == vault_inital_leader_node
 
     - name: Login on the cluster with root key 
@@ -168,28 +138,33 @@
       when: ansible_hostname == vault_inital_leader_node # and 'true' in init_status.stdout
       tags: join
 
-    - name: Useal process step 1 Vault Cluster followers
-      shell: "/data/bin/vault operator unseal {{ hostvars[vault_inital_leader_node]['unseal_key01'] }}"
-      args:
-        chdir: /root/
-        executable: /bin/bash
-      loop: "{{ vault_followers_nodes }}"
-      tags: join
-
-    - name: Useal process step 2 Vault Cluster followers
-      shell: "/data/bin/vault operator unseal {{ hostvars[vault_inital_leader_node]['unseal_key02'] }}"
-      args:
-        chdir: /root/
-        executable: /bin/bash
-      loop: "{{ vault_followers_nodes }}"
-      tags: join
-
     - name: Add follower nodes to the cluster leader
       shell: "/data/bin/vault operator raft join https://{{ vault_inital_leader_node }}:8200"
       args:
         chdir: /root/
         executable: /bin/bash
       when: ansible_hostname != vault_inital_leader_node
+      tags: join
+
+    - name: Useal process step 1 Vault Cluster followers
+      shell: "/data/bin/vault operator unseal {{ hostvars[vault_inital_leader_node]['unseal_key01'] }}"
+      args:
+        chdir: /root/
+        executable: /bin/bash
+      when: ansible_hostname in vault_followers_nodes
+      tags: join
+
+    - name: Wait for 5 seconds during follower nodes unseal
+      wait_for:
+        timeout: 5
+      when: ansible_hostname == vault_inital_leader_node
+
+    - name: Useal process step 2 Vault Cluster followers
+      shell: "/data/bin/vault operator unseal {{ hostvars[vault_inital_leader_node]['unseal_key02'] }}"
+      args:
+        chdir: /root/
+        executable: /bin/bash
+      when: ansible_hostname in vault_followers_nodes
       tags: join
 
     - name: Get Vault Cluster RAFT nodes
