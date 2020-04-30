@@ -34,7 +34,6 @@ Including an example of how to use the role setting the minimun variables:
       vault_inital_leader_node: vault01
       vault_version: 1.4.0
       vault_download_base: https://releases.hashicorp.com/vault/
-      # Vault certificate must contain certificate chain due Vault CLI limitation
       vault_cert_path: /etc/pki/tls/certs/vaultclus.example.net_chain.crt
       vault_cert_key_path: /etc/pki/tls/private/vaultclus.example.net.key
       vault_ca_path: /etc/pki/tls/certs/VAULT-CA.crt
