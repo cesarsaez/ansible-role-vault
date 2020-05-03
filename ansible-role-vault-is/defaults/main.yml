@@ -1,2 +1,12 @@
 ---
 # defaults file for ansible-role-vault-is
+vault_root_dir: /data
+vault_bin_dir: /bin
+vault_user: vault
+vault_inital_leader_node: vault01
+vault_version: 1.4.1
+vault_download_base: https://releases.hashicorp.com/vault/
+vault_cert_path: /etc/pki/tls/certs/vaultclus.gaseosalab.net_chain.crt
+vault_cert_key_path: /etc/pki/tls/private/vaultclus.gaseosalab.net.key
+vault_ca_path: /etc/pki/tls/certs/VAULT-CA-G2.crt
+vault_addr: "https://{{ ansible_hostname }}:8200"
